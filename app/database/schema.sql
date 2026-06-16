@@ -121,6 +121,7 @@ CREATE TABLE IF NOT EXISTS claim_check_items (
     suggested_reference_id INTEGER,
     evidence_text TEXT,
     page_number INTEGER,
+    citation_intent TEXT,
     confidence_score REAL,
     FOREIGN KEY(claim_check_id) REFERENCES claim_checks(id) ON DELETE CASCADE,
     FOREIGN KEY(suggested_reference_id) REFERENCES "references"(id) ON DELETE SET NULL

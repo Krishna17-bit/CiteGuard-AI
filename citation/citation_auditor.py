@@ -170,6 +170,23 @@ def audit_manuscript(text: str, library_references: list[dict], style_category: 
                 "suggested_fix": "Manually correct the year field to a standard 4-digit academic calendar year."
             })
             
+        # Check for AI Hallucinated/Fake reference warning
+        quality_score = ref.get("metadata_quality_score", 100)
+        # Quality score might be None, fallback to 100
+        if quality_score is None:
+            quality_score = 100
+        has_identifiers = bool(doi or ref.get("arxiv_id") or ref.get("pubmed_id") or ref.get("url"))
+        
+        if quality_score < 45 and not has_identifiers:
+            issues.append({
+                "issue_type": "fake_reference_warning",
+                "severity": "critical",
+                "reference_id": ref_id,
+                "message": f"Reference '{title[:40]}...' has a very low quality score ({quality_score}%) and lacks all public identifiers (DOI, arXiv, PubMed ID, URL). This may be a hallucinated or fake AI-generated citation.",
+                "location": f"Reference ID {ref_id}",
+                "suggested_fix": "Verify if this paper exists in real literature and enter its registered DOI or URL."
+            })
+            
     # Calculate health score
     score = 100
     for issue in issues:

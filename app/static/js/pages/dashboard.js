@@ -64,6 +64,143 @@ registerPage('dashboard', async () => {
             </div>
         `;
     }).join("");
+
+    // Calculate Diversity & Inclusion Metrics
+    let recentYearsCount = 0; // 2021+
+    let midYearsCount = 0;    // 2011-2020
+    let classicYearsCount = 0; // <= 2010
+    
+    let usAffiliations = 0;
+    let euAffiliations = 0;
+    let rowAffiliations = 0;
+    
+    let estMaleAuthors = 0;
+    let estFemaleAuthors = 0;
+    
+    references.forEach(r => {
+        const y = r.year;
+        if (y) {
+            if (y >= 2021) recentYearsCount++;
+            else if (y >= 2011) midYearsCount++;
+            else classicYearsCount++;
+        }
+        
+        const p = (r.publisher || "").toLowerCase();
+        const j = (r.journal || r.container_title || "").toLowerCase();
+        if (p.includes("acm") || p.includes("ieee") || p.includes("addison") || p.includes("arxiv") || p.includes("university") || p.includes("press") || j.includes("acm") || j.includes("ieee")) {
+            usAffiliations++;
+        } else if (p.includes("elsevier") || p.includes("springer") || p.includes("nature") || p.includes("uk") || p.includes("netherlands") || j.includes("elsevier") || j.includes("springer") || j.includes("nature")) {
+            euAffiliations++;
+        } else {
+            rowAffiliations++;
+        }
+        
+        const authorStr = r.authors || "";
+        const parts = authorStr.split(",");
+        const firstName = parts.length > 1 ? parts[1].trim().split(" ")[0] : "";
+        if (firstName) {
+            const lastChar = firstName.slice(-1).toLowerCase();
+            if (["a", "e", "i", "y", "o"].includes(lastChar)) {
+                estFemaleAuthors++;
+            } else {
+                estMaleAuthors++;
+            }
+        }
+    });
+    
+    const totalWithYear = recentYearsCount + midYearsCount + classicYearsCount;
+    const recentPct = totalWithYear > 0 ? (recentYearsCount / totalWithYear * 100).toFixed(0) : 0;
+    const midPct = totalWithYear > 0 ? (midYearsCount / totalWithYear * 100).toFixed(0) : 0;
+    const classicPct = totalWithYear > 0 ? (classicYearsCount / totalWithYear * 100).toFixed(0) : 0;
+    
+    const usPct = total > 0 ? (usAffiliations / total * 100).toFixed(0) : 0;
+    const euPct = total > 0 ? (euAffiliations / total * 100).toFixed(0) : 0;
+    const rowPct = total > 0 ? (rowAffiliations / total * 100).toFixed(0) : 0;
+    
+    const totalAuthors = estMaleAuthors + estFemaleAuthors;
+    const femalePct = totalAuthors > 0 ? (estFemaleAuthors / totalAuthors * 100).toFixed(0) : 0;
+    const malePct = totalAuthors > 0 ? (estMaleAuthors / totalAuthors * 100).toFixed(0) : 0;
+
+    const temporalHTML = `
+        <div style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Recent (2021+)</span>
+                <span>${recentYearsCount} (${recentPct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${recentPct}%; background-color: var(--success); border-radius: 3px;"></div>
+            </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Mid-Range (2011-2020)</span>
+                <span>${midYearsCount} (${midPct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${midPct}%; background-color: var(--accent); border-radius: 3px;"></div>
+            </div>
+        </div>
+        <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Classic (&le; 2010)</span>
+                <span>${classicYearsCount} (${classicPct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${classicPct}%; background-color: var(--info); border-radius: 3px;"></div>
+            </div>
+        </div>
+    `;
+    
+    const geoHTML = `
+        <div style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>North America</span>
+                <span>${usAffiliations} (${usPct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${usPct}%; background-color: var(--accent); border-radius: 3px;"></div>
+            </div>
+        </div>
+        <div style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Europe</span>
+                <span>${euAffiliations} (${euPct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${euPct}%; background-color: var(--info); border-radius: 3px;"></div>
+            </div>
+        </div>
+        <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Rest of World</span>
+                <span>${rowAffiliations} (${rowPct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${rowPct}%; background-color: var(--text-muted); border-radius: 3px;"></div>
+            </div>
+        </div>
+    `;
+    
+    const demographicsHTML = `
+        <div style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Estimated Diverse/Female First Authors</span>
+                <span>${estFemaleAuthors} (${femalePct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${femalePct}%; background-color: var(--success); border-radius: 3px;"></div>
+            </div>
+        </div>
+        <div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+                <span>Estimated Male First Authors</span>
+                <span>${estMaleAuthors} (${malePct}%)</span>
+            </div>
+            <div style="height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: ${malePct}%; background-color: var(--accent); border-radius: 3px;"></div>
+            </div>
+        </div>
+    `;
     
     return `
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -156,6 +293,30 @@ registerPage('dashboard', async () => {
                             <p>No statistics available yet.</p>
                         </div>
                     ` : typeListHTML}
+                </div>
+            </div>
+        </div>
+
+        <!-- Citation Diversity & Inclusion Audit Card -->
+        <div class="card" style="margin-top: 24px;">
+            <div class="card-header">
+                <h4><i class="fa-solid fa-earth-americas" style="color: var(--accent);"></i> Inclusive Citation & Diversity Audit</h4>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px;">
+                <!-- Temporal balance -->
+                <div>
+                    <h5 style="margin-bottom: 12px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Temporal Balance (Literature Age)</h5>
+                    ${temporalHTML}
+                </div>
+                <!-- Geographical distribution -->
+                <div>
+                    <h5 style="margin-bottom: 12px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Regional Affiliation (Publisher HQ)</h5>
+                    ${geoHTML}
+                </div>
+                <!-- Author diversity estimation -->
+                <div>
+                    <h5 style="margin-bottom: 12px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Author Gender Diversity (Estimates)</h5>
+                    ${demographicsHTML}
                 </div>
             </div>
         </div>

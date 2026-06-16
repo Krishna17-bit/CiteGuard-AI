@@ -47,9 +47,14 @@ os.makedirs(EXPORT_DIR, exist_ok=True)
 @app.on_event("startup")
 def startup_event():
     init_db()
-    # Seed default project if empty
+    # Ensure database schema is migrated for citation_intent
     with get_db() as conn:
         cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(claim_check_items);")
+        columns = [row["name"] for row in cursor.fetchall()]
+        if "citation_intent" not in columns:
+            cursor.execute("ALTER TABLE claim_check_items ADD COLUMN citation_intent TEXT;")
+            
         cursor.execute("SELECT COUNT(*) as cnt FROM projects;")
         if cursor.fetchone()["cnt"] == 0:
             # Import seed data helper inline or create simple project
@@ -428,6 +433,8 @@ def verify_manuscript_claims(data: ClaimVerifyModel):
         evidence = ""
         confidence = 0.5
         explanation = "This sentence contains factual claims but does not reference any citations."
+        page_number = None
+        citation_intent = "Background"
         
         # Check if they have an existing citation
         has_bracket = "[" in c or "(" in c
@@ -446,6 +453,8 @@ def verify_manuscript_claims(data: ClaimVerifyModel):
             evidence = verification["evidence_text"]
             confidence = verification["confidence_score"]
             explanation = verification["explanation"]
+            page_number = verification.get("page_number")
+            citation_intent = verification.get("citation_intent")
         elif suggestions:
             # Recommend a source
             suggested_ref = suggestions[0]["reference"]
@@ -454,12 +463,22 @@ def verify_manuscript_claims(data: ClaimVerifyModel):
             confidence = suggestions[0]["score"] / 10.0 # Normalize score
             confidence = min(0.9, max(0.3, confidence))
             
+            # Retrieve page_number and citation_intent for recommendations
+            pdf_text = ""
+            file_record = fetch_one("SELECT * FROM reference_files WHERE reference_id = ?;", (suggested_ref["id"],))
+            if file_record:
+                pages = fetch_all("SELECT text FROM reference_pages WHERE reference_file_id = ? ORDER BY page_number ASC;", (file_record["id"],))
+                pdf_text = "\n".join([p["text"] for p in pages])
+            verification = verify_claim_against_reference(c, suggested_ref, pdf_text)
+            page_number = verification.get("page_number")
+            citation_intent = verification.get("citation_intent")
+            
         suggested_id = suggested_ref["id"] if suggested_ref else None
         
         execute_write(
-            """INSERT INTO claim_check_items (claim_check_id, claim_text, current_citation, status, suggested_reference_id, evidence_text, confidence_score)
-               VALUES (?, ?, ?, ?, ?, ?, ?);""",
-            (claim_check_id, c, "[Cited]" if has_bracket else "", status, suggested_id, evidence, confidence)
+            """INSERT INTO claim_check_items (claim_check_id, claim_text, current_citation, status, suggested_reference_id, evidence_text, page_number, citation_intent, confidence_score)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);""",
+            (claim_check_id, c, "[Cited]" if has_bracket else "", status, suggested_id, evidence, page_number, citation_intent, confidence)
         )
         
         verified_items.append({
@@ -470,7 +489,9 @@ def verify_manuscript_claims(data: ClaimVerifyModel):
             "suggested_reference_id": suggested_id,
             "evidence": evidence,
             "confidence": confidence,
-            "explanation": explanation
+            "explanation": explanation,
+            "page_number": page_number,
+            "citation_intent": citation_intent
         })
         
     return {"claim_check_id": claim_check_id, "results": verified_items}

@@ -131,3 +131,32 @@ def test_export_compilation():
     assert "TY  - JOUR" in ris
     assert "TI  - Refactoring Databases" in ris
     assert "ER  - " in ris
+
+# 10. Advanced Features Tests
+def test_advanced_features():
+    from citation.claim_citation_verifier import verify_claim_against_reference
+    
+    # Check fake reference warning in audit
+    fake_ref = {
+        "id": 4,
+        "title": "A Totally Made Up Academic Paper Title That Does Not Exist",
+        "authors": "Ghost, Writer",
+        "year": 2025,
+        "doi": "",
+        "arxiv_id": "",
+        "pubmed_id": "",
+        "url": "",
+        "metadata_quality_score": 30
+    }
+    
+    audit = audit_manuscript("We reference the ghost writer paper [1].", [fake_ref], "numeric")
+    fake_warnings = [i for i in audit["issues"] if i["issue_type"] == "fake_reference_warning"]
+    assert len(fake_warnings) == 1
+    assert fake_warnings[0]["severity"] == "critical"
+    
+    # Check verify_claim_against_reference: citation_intent Methodology and Critique
+    res_method = verify_claim_against_reference("We describe our method approach here.", fake_ref)
+    assert res_method["citation_intent"] == "Methodology"
+    
+    res_critique = verify_claim_against_reference("Our study fails to outline these limits.", fake_ref)
+    assert res_critique["citation_intent"] == "Critique"

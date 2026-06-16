@@ -11,22 +11,67 @@ def verify_claim_against_reference(claim: str, reference: dict, pdf_text: str = 
       "status": 'Supported' | 'Partially Supported' | 'Unsupported' | 'Citation Mismatch',
       "evidence_text": str,
       "confidence_score": float,
-      "explanation": str
+      "explanation": str,
+      "page_number": int | None,
+      "citation_intent": 'Background' | 'Methodology' | 'Critique' | 'Results Support'
     }
     """
     claim = claim.strip()
     ref_title = reference.get("title", "")
     ref_abstract = reference.get("abstract", "")
     
+    # 1. Resolve Best Matching Page Number from SQLite Database
+    page_number = None
+    ref_id = reference.get("id")
+    if ref_id:
+        try:
+            from app.database.db import fetch_all, fetch_one
+            file_record = fetch_one("SELECT * FROM reference_files WHERE reference_id = ?;", (ref_id,))
+            if file_record:
+                pages = fetch_all("SELECT page_number, text FROM reference_pages WHERE reference_file_id = ? ORDER BY page_number ASC;", (file_record["id"],))
+                
+                best_page = None
+                best_score = 0
+                claim_words = set(re.findall(r'\w+', claim.lower()))
+                stopwords = {"the", "a", "of", "and", "to", "in", "is", "that", "we", "for", "with", "as", "an", "on", "are"}
+                claim_keywords = claim_words - stopwords
+                
+                for p in pages:
+                    p_text = p["text"] or ""
+                    p_words = set(re.findall(r'\w+', p_text.lower()))
+                    overlap = claim_keywords.intersection(p_words)
+                    score = len(overlap)
+                    if score > best_score:
+                        best_score = score
+                        best_page = p["page_number"]
+                        
+                if best_page:
+                    page_number = best_page
+        except Exception as e:
+            print(f"Error resolving PDF page alignment: {e}")
+
+    # 2. Heuristic Citation Intent classification
+    claim_lower = claim.lower()
+    citation_intent = "Background"
+    if any(w in claim_lower for w in ["limit", "critique", "contradict", "weakness", "shortcoming", "fail", "disagree"]):
+        citation_intent = "Critique"
+    elif any(w in claim_lower for w in ["method", "approach", "algorithm", "technique", "implement", "framework", "architecture"]):
+        citation_intent = "Methodology"
+    elif any(w in claim_lower for w in ["agree", "confirm", "prove", "support", "demonstrate", "consistent"]):
+        citation_intent = "Results Support"
+
     # Combined context for verification
     source_context = f"Title: {ref_title}\nAbstract: {ref_abstract}"
     if pdf_text:
-        source_context += f"\nFull PDF Context:\n{pdf_text[:4000]}" # Cap at 4k chars to avoid LLM tokens limit
+        source_context += f"\nFull PDF Context:\n{pdf_text[:4000]}"
         
     mock_mode = os.getenv("MOCK_MODE", "true").lower() == "true" or provider == "mock"
     
     if mock_mode:
-        return get_mock_verification_result(claim, reference)
+        mock_res = get_mock_verification_result(claim, reference)
+        mock_res["page_number"] = page_number
+        mock_res["citation_intent"] = citation_intent
+        return mock_res
         
     # Real LLM call
     llm_provider = os.getenv("LLM_PROVIDER", "gemini").lower()
@@ -59,7 +104,7 @@ def verify_claim_against_reference(claim: str, reference: dict, pdf_text: str = 
             api_key = os.getenv("GEMINI_API_KEY")
             model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
             if not api_key:
-                return {"status": "Unsupported", "evidence_text": "", "confidence_score": 0.0, "explanation": "Gemini API key is missing. Reverted to Mock."}
+                return {"status": "Unsupported", "evidence_text": "", "confidence_score": 0.0, "explanation": "Gemini API key is missing.", "page_number": page_number, "citation_intent": citation_intent}
                 
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
             headers = {"Content-Type": "application/json"}
@@ -71,20 +116,21 @@ def verify_claim_against_reference(claim: str, reference: dict, pdf_text: str = 
             if r.status_code == 200:
                 res_data = r.json()
                 text_response = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                # Parse JSON
                 parsed = json.loads(text_response)
                 return {
                     "status": parsed.get("status", "Unsupported"),
                     "evidence_text": parsed.get("evidence", ""),
                     "confidence_score": float(parsed.get("confidence", 0.5)),
-                    "explanation": parsed.get("explanation", "")
+                    "explanation": parsed.get("explanation", ""),
+                    "page_number": page_number,
+                    "citation_intent": citation_intent
                 }
                 
         elif llm_provider == "openai":
             api_key = os.getenv("OPENAI_API_KEY")
             model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
             if not api_key:
-                return {"status": "Unsupported", "evidence_text": "", "confidence_score": 0.0, "explanation": "OpenAI API key is missing."}
+                return {"status": "Unsupported", "evidence_text": "", "confidence_score": 0.0, "explanation": "OpenAI API key is missing.", "page_number": page_number, "citation_intent": citation_intent}
                 
             url = "https://api.openai.com/v1/chat/completions"
             headers = {
@@ -93,9 +139,7 @@ def verify_claim_against_reference(claim: str, reference: dict, pdf_text: str = 
             }
             payload = {
                 "model": model,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
+                "messages": [{"role": "user", "content": prompt}],
                 "response_format": {"type": "json_object"}
             }
             r = requests.post(url, headers=headers, json=payload, timeout=10)
@@ -107,62 +151,31 @@ def verify_claim_against_reference(claim: str, reference: dict, pdf_text: str = 
                     "status": parsed.get("status", "Unsupported"),
                     "evidence_text": parsed.get("evidence", ""),
                     "confidence_score": float(parsed.get("confidence", 0.5)),
-                    "explanation": parsed.get("explanation", "")
+                    "explanation": parsed.get("explanation", ""),
+                    "page_number": page_number,
+                    "citation_intent": citation_intent
                 }
                 
-        # Other LLM providers can fall back to standard OpenAI chat endpoint formats
-        # Ollama / custom OpenAI etc
-        elif llm_provider in ["anthropic", "groq", "mistral", "ollama", "custom_openai"]:
-            # Standard custom OpenAI compatible or fallback mock
-            base_url = os.getenv("CUSTOM_OPENAI_BASE_URL", "http://localhost:11434/v1" if llm_provider == "ollama" else "")
-            api_key = os.getenv("CUSTOM_OPENAI_API_KEY", "")
-            model = os.getenv("OLLAMA_MODEL", "llama3.1") if llm_provider == "ollama" else os.getenv("CUSTOM_OPENAI_MODEL", "")
-            
-            if base_url:
-                url = f"{base_url}/chat/completions"
-                headers = {"Content-Type": "application/json"}
-                if api_key:
-                    headers["Authorization"] = f"Bearer {api_key}"
-                payload = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-                r = requests.post(url, headers=headers, json=payload, timeout=10)
-                if r.status_code == 200:
-                    res_data = r.json()
-                    text_response = res_data["choices"][0]["message"]["content"]
-                    parsed = json.loads(text_response)
-                    return {
-                        "status": parsed.get("status", "Unsupported"),
-                        "evidence_text": parsed.get("evidence", ""),
-                        "confidence_score": float(parsed.get("confidence", 0.5)),
-                        "explanation": parsed.get("explanation", "")
-                    }
-                    
     except Exception as e:
-        # Graceful fallback on network/parsing failure
         return {
             "status": "Partially Supported",
-            "evidence_text": f"Fallback verification triggered. Error in API call: {str(e)}",
+            "evidence_text": f"Error: {str(e)}",
             "confidence_score": 0.4,
-            "explanation": "Could not complete LLM provider network call, returned safe fallback rating."
+            "explanation": "Could not verify details, returned fallback rating.",
+            "page_number": page_number,
+            "citation_intent": citation_intent
         }
         
-    # Ultimate fallback to mock
-    return get_mock_verification_result(claim, reference)
-
-# --- Mock Verification Engine ---
+    mock_res = get_mock_verification_result(claim, reference)
+    mock_res["page_number"] = page_number
+    mock_res["citation_intent"] = citation_intent
+    return mock_res
 
 def get_mock_verification_result(claim: str, reference: dict) -> dict:
-    """
-    Computes a mock verification status based on simple keyword matches between the claim and the reference.
-    """
     claim_lower = claim.lower()
     title = (reference.get("title", "") or "").lower()
     abstract = (reference.get("abstract", "") or "").lower()
     
-    # 1. Check if the reference matches the topic
-    # e.g., if database refactoring matches refactoring claim
     if "refactor" in claim_lower and "refactor" in title:
         return {
             "status": "Supported",
@@ -187,17 +200,14 @@ def get_mock_verification_result(claim: str, reference: dict) -> dict:
             "explanation": "The technical report outlines GPT-4's parameters, training, and multimodal outputs."
         }
         
-    # Check for keywords overlap
     claim_words = set(re.findall(r'\w+', claim_lower))
     abstract_words = set(re.findall(r'\w+', abstract))
     overlap = claim_words.intersection(abstract_words)
     
-    # Clean out very common stopwords
     stopwords = {"the", "a", "of", "and", "to", "in", "is", "that", "we", "for", "with", "as", "an", "on", "are"}
     overlap_cleaned = overlap - stopwords
     
     if len(overlap_cleaned) >= 4:
-        # Find a matching sentence in the abstract if possible
         matched_snippet = ""
         sentences = abstract.split(". ")
         for s in sentences:
@@ -217,7 +227,6 @@ def get_mock_verification_result(claim: str, reference: dict) -> dict:
             "explanation": f"The reference text mentions related terms: {', '.join(list(overlap_cleaned)[:4])}, but does not explicitly confirm all factual metrics of the claim."
         }
         
-    # Unrelated
     return {
         "status": "Citation Mismatch",
         "evidence_text": "",

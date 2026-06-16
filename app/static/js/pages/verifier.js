@@ -154,20 +154,42 @@ registerPage('verifier', async () => {
                     const idx = parseInt(e.currentTarget.getAttribute("data-idx"));
                     const item = res.results[idx];
                     
+                    let intentBadge = "";
+                    const intent = item.citation_intent || "Background";
+                    if (intent === "Critique") {
+                        intentBadge = `<span class="badge badge-danger"><i class="fa-solid fa-triangle-exclamation"></i> Critique</span>`;
+                    } else if (intent === "Methodology") {
+                        intentBadge = `<span class="badge badge-warning"><i class="fa-solid fa-gears"></i> Methodology</span>`;
+                    } else if (intent === "Results Support") {
+                        intentBadge = `<span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Results Support</span>`;
+                    } else {
+                        intentBadge = `<span class="badge badge-info"><i class="fa-solid fa-circle-info"></i> Background</span>`;
+                    }
+                    
                     detailsCard.classList.remove("hidden");
                     detailsBody.innerHTML = `
                         <div>
                             <strong>Audited Claim Sentence:</strong>
                             <p style="color: var(--text-primary); font-size: 14px; margin-top: 4px; background-color: var(--bg-main); padding: 10px; border-radius: 6px;">"${item.claim}"</p>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px;">
                             <div>
                                 <strong>Match Status:</strong><br>
                                 <span style="margin-top: 4px; display: inline-block;">${item.status === 'Supported' ? '<span class="badge badge-success">Supported</span>' : item.status === 'Partially Supported' ? '<span class="badge badge-warning">Partially Supported</span>' : '<span class="badge badge-danger">' + item.status + '</span>'}</span>
                             </div>
                             <div>
                                 <strong>Confidence Score:</strong><br>
-                                <strong style="font-size: 16px; color: var(--accent);">${(item.confidence * 100).toFixed(0)}%</strong>
+                                <strong style="font-size: 16px; color: var(--accent); margin-top: 4px; display: inline-block;">${(item.confidence * 100).toFixed(0)}%</strong>
+                            </div>
+                            <div>
+                                <strong>Evidence Source:</strong><br>
+                                <span style="margin-top: 4px; display: inline-block;" class="badge badge-secondary">
+                                    <i class="fa-solid fa-file-pdf"></i> ${item.page_number ? 'Page ' + item.page_number : 'Abstract / Library'}
+                                </span>
+                            </div>
+                            <div>
+                                <strong>Citation Intent:</strong><br>
+                                <span style="margin-top: 4px; display: inline-block;">${intentBadge}</span>
                             </div>
                         </div>
                         <div>

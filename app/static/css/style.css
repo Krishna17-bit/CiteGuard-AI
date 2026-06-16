@@ -395,6 +395,12 @@ h1, h2, h3, h4, h5, .logo {
     border-color: hsla(200, 85%, 50%, 0.3);
 }
 
+.badge-secondary {
+    background-color: var(--border-color);
+    color: var(--text-secondary);
+    border-color: hsla(217, 16%, 24%, 0.3);
+}
+
 /* Glassmorphic Cards */
 .card {
     background-color: var(--bg-card);
