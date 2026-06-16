@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  citeguard-app:
+    build: .
+    container_name: citeguard-ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./citeguard.db:/app/citeguard.db
+      - ./uploads:/app/uploads
+      - ./exports:/app/exports
+    environment:
+      - MOCK_MODE=true
+    restart: always

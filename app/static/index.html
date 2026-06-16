@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiteGuard AI — Citation Audit & Claim Verification</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    <span>CiteGuard <span class="accent-text">AI</span></span>
+                </div>
+                <div class="demo-tag">MOCK DEMO</div>
+            </div>
+            
+            <div class="project-selector-wrapper">
+                <label for="global-project-select"><i class="fa-solid fa-folder-open"></i> Active Project</label>
+                <select id="global-project-select" class="form-input">
+                    <option value="">Loading Projects...</option>
+                </select>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">MAIN</div>
+                <a href="#dashboard" class="nav-link active" data-page="dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </a>
+                <a href="#projects" class="nav-link" data-page="projects">
+                    <i class="fa-solid fa-diagram-project"></i> Projects Manager
+                </a>
+                <a href="#references" class="nav-link" data-page="references">
+                    <i class="fa-solid fa-book-bookmark"></i> Reference Library
+                </a>
+                
+                <div class="nav-section">CITATIONS</div>
+                <a href="#import" class="nav-link" data-page="import">
+                    <i class="fa-solid fa-file-import"></i> Import References
+                </a>
+                <a href="#repair" class="nav-link" data-page="repair">
+                    <i class="fa-solid fa-screwdriver-wrench"></i> Metadata Repair
+                </a>
+                <a href="#formatter" class="nav-link" data-page="formatter">
+                    <i class="fa-solid fa-file-pen"></i> Citation Formatter
+                </a>
+                
+                <div class="nav-section">INTELLIGENCE</div>
+                <a href="#audit" class="nav-link" data-page="audit">
+                    <i class="fa-solid fa-file-shield"></i> Manuscript Audit
+                </a>
+                <a href="#verifier" class="nav-link" data-page="verifier">
+                    <i class="fa-solid fa-circle-check"></i> Claim Verifier
+                </a>
+                <a href="#suggester" class="nav-link" data-page="suggester">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Citation Suggester
+                </a>
+                
+                <div class="nav-section">CLEANUP & CHECKS</div>
+                <a href="#duplicates" class="nav-link" data-page="duplicates">
+                    <i class="fa-solid fa-clone"></i> Duplicate Detector
+                </a>
+                <a href="#cleaner" class="nav-link" data-page="cleaner">
+                    <i class="fa-solid fa-broom"></i> BibTeX Cleaner
+                </a>
+                <a href="#checker" class="nav-link" data-page="checker">
+                    <i class="fa-solid fa-clipboard-check"></i> Journal Checker
+                </a>
+                
+                <div class="nav-section">SYSTEM</div>
+                <a href="#settings" class="nav-link" data-page="settings">
+                    <i class="fa-solid fa-sliders"></i> System Settings
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="version">v1.0.0 (Local-First)</div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Topbar Header -->
+            <header class="topbar">
+                <div class="search-bar">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="global-search" placeholder="Search references by title, authors, or DOI...">
+                </div>
+                
+                <div class="topbar-actions">
+                    <div id="connection-badge" class="badge badge-success">
+                        <i class="fa-solid fa-bolt"></i> Mock Mode Active
+                    </div>
+                    <button id="quick-add-btn" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-plus"></i> Add Reference
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dynamic SPA Page Wrapper -->
+            <div id="page-content" class="content-wrapper">
+                <!-- Pages are dynamically injected here by app.js -->
+                <div class="page-loading">
+                    <div class="spinner"></div>
+                    <p>Loading CiteGuard AI Workbench...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Quick Add Reference Modal (Global Overlay) -->
+    <div id="global-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-plus"></i> Manual Reference Entry</h3>
+                <button class="modal-close-btn" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="quick-add-form" class="modal-form">
+                    <div class="form-row">
+                        <div class="form-group col-8">
+                            <label>Title <span class="required">*</span></label>
+                            <input type="text" id="m-title" required class="form-input" placeholder="e.g. Attention Is All You Need">
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Source Type</label>
+                            <select id="m-type" class="form-input">
+                                <option value="journal article">Journal Article</option>
+                                <option value="conference paper">Conference Paper</option>
+                                <option value="book">Book</option>
+                                <option value="book chapter">Book Chapter</option>
+                                <option value="thesis">Thesis</option>
+                                <option value="report">Technical Report</option>
+                                <option value="preprint">Preprint / Archive</option>
+                                <option value="website">Website</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-8">
+                            <label>Authors (Last, First; separate with 'and') <span class="required">*</span></label>
+                            <input type="text" id="m-authors" required class="form-input" placeholder="e.g. Vaswani, Ashish and Shazeer, Noam">
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Publication Year <span class="required">*</span></label>
+                            <input type="number" id="m-year" required class="form-input" placeholder="e.g. 2017">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label>DOI</label>
+                            <input type="text" id="m-doi" class="form-input" placeholder="e.g. 10.1016/j.jss.2021.111000">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>arXiv ID / PMC ID</label>
+                            <input type="text" id="m-arxiv" class="form-input" placeholder="e.g. 1706.03762">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label>Journal / Book / Venue Title</label>
+                            <input type="text" id="m-venue" class="form-input" placeholder="e.g. Advances in Neural Information Processing Systems">
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Publisher</label>
+                            <input type="text" id="m-publisher" class="form-input" placeholder="e.g. Curran Associates">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-4">
+                            <label>Volume</label>
+                            <input type="text" id="m-volume" class="form-input">
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Issue</label>
+                            <input type="text" id="m-issue" class="form-input">
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Pages</label>
+                            <input type="text" id="m-pages" class="form-input" placeholder="e.g. 5998-6008">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Abstract</label>
+                        <textarea id="m-abstract" rows="3" class="form-input" placeholder="Enter abstract snippet or summary for claim support verification..."></textarea>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Reference</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Toast Alert Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Application Script Router -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
