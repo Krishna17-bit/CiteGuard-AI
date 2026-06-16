@@ -17,4 +17,4 @@ ENV APP_MODE=production
 ENV DATABASE_URL=sqlite:///citeguard.db
 
 # Run the app runner
-CMD ["python", "app.py"]
+CMD ["python", "server.py"]

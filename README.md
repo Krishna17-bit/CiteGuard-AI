@@ -184,7 +184,7 @@ citeguard-ai/
 │   └── test_citation_engine.py   # Unit testing suite
 ├── .env.example                  # Environment configuration template
 ├── .gitignore
-├── app.py                        # FastAPI web server entrypoint
+├── server.py                     # FastAPI web server entrypoint
 ├── Dockerfile                    # Docker build configuration
 ├── docker-compose.yml            # Local hosting deployment compose file
 └── requirements.txt              # Project package requirements
@@ -203,7 +203,7 @@ cd CiteGuard-AI
 cp .env.example .env
 # Keep MOCK_MODE=true for local-first zero API key demo mode
 pip install -r requirements.txt
-python app.py
+python server.py
 ```
 Open `http://localhost:8000` in your web browser.
 
